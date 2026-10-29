@@ -5,7 +5,7 @@
   "gates": {
     "unit_and_cli": "passed",
     "core_compatibility_tests": "passed",
-    "eight_combination_integration": "pending",
+    "eight_combination_integration": "passed",
     "shared_443_behavior": "pending",
     "public_vps": "pending",
     "real_acme_renewal": "pending",
@@ -13,8 +13,21 @@
     "lifecycle_and_native_concurrency": "pending",
     "controller_platforms": "pending",
     "codex_forward_test": "passed",
-    "licenses_and_source": "pending",
+    "licenses_and_source": "passed",
     "security_advisories": "pending",
     "secret_scan": "passed"
+  },
+  "evidence": {
+    "integration": {
+      "commit": "2f6c6fff224a908b49f94556c9baa0921aa05330",
+      "run": "https://github.com/utenasama/reality-proxy-kit/actions/runs/40902100858",
+      "scope": "All eight disposable Ubuntu combinations; real TCP/UDP, final DNS/egress, route/private/IPv6 denial, exit failure without fallback, legacy X25519 and Safari fingerprints, native subscriptions and Xray profile syntax, core account disable/enable deployments, native account lifecycle, core-to-panel adoption without public subscriptions, and encrypted backup restored to a blank panel entry with stable identities."
+    },
+    "source": {
+      "source_sha256": "e13e524d2ea13b2f9fae5bbe7e5cc10737f80629bfdfa905079f6e90e6f2d79c",
+      "binary_sha256": "691a9a7a0fe6ffbf1182d676d0e6eb29ba584cba975a3b66c2193a1310b92e87",
+      "module_rebuild": "byte-identical; module cache; network disabled",
+      "vendor_rebuild": "passed; different Go module metadata and binary hash"
+    }
   }
 }
