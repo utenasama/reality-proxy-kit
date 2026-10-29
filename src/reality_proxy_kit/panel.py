@@ -1,7 +1,9 @@
 """3x-ui v3.11.0 native API adapter. Never writes a running SQLite database."""
 import copy
+import contextlib
 import http.cookiejar
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -60,9 +62,13 @@ def settings(deployment, state):
 def prepare(deployment, state, db_path="/etc/x-ui/x-ui.db"):
     if Path(db_path).exists():
         raise ValueError("Panel preparation requires an empty database path")
-    result = subprocess.run(["/usr/local/x-ui/x-ui", "setting", "-username", state["panel"]["username"],
-                             "-password", state["panel"]["password"], "-port", "54321", "-listenIP", "127.0.0.1",
-                             "-webBasePath", "/admin/"], capture_output=True)
+    mask = os.umask(0o077)
+    try:
+        result = subprocess.run(["/usr/local/x-ui/x-ui", "setting", "-username", state["panel"]["username"],
+                                 "-password", state["panel"]["password"], "-port", "54321", "-listenIP", "127.0.0.1",
+                                 "-webBasePath", "/admin/"], capture_output=True)
+    finally:
+        os.umask(mask)
     if result.returncode:
         raise RuntimeError("Unable to initialize native panel")
     # This function is called before starting the panel, only on an empty host.
@@ -142,18 +148,26 @@ def update_template(api, template):
                                       "outboundTestUrl": x.get("outboundTestUrl", "https://www.gstatic.com/generate_204")})
 
 
-def snapshot(deployment, seed, db_path="/etc/x-ui/x-ui.db"):
+def snapshot(deployment, seed, db_path="/etc/x-ui/x-ui.db", include_database=True):
     """Use SQLite backup for one consistent DB image; traffic counters aren't CAS inputs."""
-    with sqlite3.connect("file:" + str(db_path) + "?mode=ro", uri=True) as source, sqlite3.connect(":memory:") as db:
-        source.backup(db)
+    with contextlib.ExitStack() as stack:
+        source = stack.enter_context(contextlib.closing(sqlite3.connect("file:" + str(db_path) + "?mode=ro", uri=True)))
+        if include_database:
+            db = stack.enter_context(contextlib.closing(sqlite3.connect(":memory:")))
+            source.backup(db)
+        else:
+            db = source
+            db.execute("BEGIN")
         db.row_factory = sqlite3.Row
         template = json.loads(db.execute("SELECT value FROM settings WHERE key='xrayTemplateConfig'").fetchone()[0])
         native = [dict(r) for r in db.execute("SELECT id,email,uuid,sub_id,enable,comment FROM clients ORDER BY id")]
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "snapshot.db"
-            with sqlite3.connect(target) as dest:
-                db.backup(dest)
-            image = target.read_bytes()
+        image = b""
+        if include_database:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / "snapshot.db"
+                with sqlite3.connect(target) as dest:
+                    db.backup(dest)
+                image = target.read_bytes()
     result = copy.deepcopy(seed)
     mapping = {}
     for rule in template.get("routing", {}).get("rules", []):

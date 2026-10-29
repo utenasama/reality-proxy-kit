@@ -3,6 +3,7 @@ import copy
 import io
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import tarfile
@@ -198,6 +199,26 @@ class Exports(unittest.TestCase):
 
 
 class Recovery(unittest.TestCase):
+    def test_native_snapshot_read_and_backup_preserve_same_authority(self):
+        from reality_proxy_kit import panel
+        d = deployment("chain", "panel"); s = state.initialize(d, ["alice"])
+        s = state.mutate(s, d, "grant", "alice", ["route-a"])
+        a = s["accounts"][0]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "panel.db"
+            with sqlite3.connect(path) as db:
+                db.execute("CREATE TABLE settings(key TEXT,value TEXT)")
+                db.execute("INSERT INTO settings VALUES(?,?)", ("xrayTemplateConfig", json.dumps(config.panel_template(d, s))))
+                db.execute("CREATE TABLE clients(id INTEGER PRIMARY KEY, email TEXT, uuid TEXT, sub_id TEXT, enable INT, comment TEXT)")
+                db.execute("INSERT INTO clients VALUES(?,?,?,?,?,?)", (1, a["name"], a["uuid"], a["sub_id"], 1, "rpk:id:" + a["id"]))
+            full, image, token = panel.snapshot(d, s, path)
+            readonly, empty, token2 = panel.snapshot(d, s, path, include_database=False)
+            self.assertEqual(full, readonly)
+            self.assertEqual(token, token2)
+            self.assertEqual(full["accounts"][0]["routes"], ["route-a"])
+            self.assertTrue(image.startswith(b"SQLite format 3"))
+            self.assertEqual(empty, b"")
+
     def test_round_trip_preserves_all_identities(self):
         for management in ("core", "panel"):
             d = deployment("chain", management); s = state.initialize(d, ["alice"])

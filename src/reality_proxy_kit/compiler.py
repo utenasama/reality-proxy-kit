@@ -90,7 +90,7 @@ def compile_bundle(deployment, state, output, binary, build_manifest, receipts=N
                 add("etc/reality-proxy-kit/xray.json", config.entry_config(deployment, state), 0o640)
                 add("etc/systemd/system/rpk-entry.service", config.core_unit(), 0o644)
             else:
-                add("etc/systemd/system/x-ui.service", "[Unit]\nDescription=3x-ui managed by Reality Proxy Kit\nAfter=network-online.target rpk-firewall.service\n[Service]\nWorkingDirectory=/usr/local/x-ui\nEnvironment=UTENASAMA_REALITY_LEGACY_X25519=1\nEnvironment=RPK_VLESS_IDENTITY_ROUTING=1\nExecStart=/usr/local/x-ui/x-ui\nRestart=on-failure\nRestartSec=3\nLimitNOFILE=65536\n[Install]\nWantedBy=multi-user.target\n", 0o644)
+                add("etc/systemd/system/x-ui.service", "[Unit]\nDescription=3x-ui managed by Reality Proxy Kit\nAfter=network-online.target rpk-firewall.service\n[Service]\nUMask=0077\nWorkingDirectory=/usr/local/x-ui\nEnvironment=UTENASAMA_REALITY_LEGACY_X25519=1\nEnvironment=RPK_VLESS_IDENTITY_ROUTING=1\nExecStart=/usr/local/x-ui/x-ui\nRestart=on-failure\nRestartSec=3\nLimitNOFILE=65536\n[Install]\nWantedBy=multi-user.target\n", 0o644)
                 if restore_db:
                     add("etc/x-ui/x-ui.db", Path(restore_db).read_bytes(), initial=True)
                 if deployment.data.get("subscriptions"):

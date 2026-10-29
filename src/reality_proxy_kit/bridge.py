@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
+import sqlite3
 import urllib.request
 from .client import filter_native
 from .config import allowed_routes, panel_template
@@ -19,9 +20,12 @@ def subscription(path, *, base=BASE):
     if not match:
         raise ValueError("Invalid subscription path")
     kind, token = match.groups()
+    with sqlite3.connect("file:/etc/x-ui/x-ui.db?mode=ro", uri=True) as db:
+        if not db.execute("SELECT 1 FROM clients WHERE sub_id=? AND enable=1 LIMIT 1", (token,)).fetchone():
+            raise ValueError("No authorized nodes")
     spec = Deployment(json.loads((base / "deployment.json").read_text()))
     seed = json.loads((base / "state.json").read_text())
-    live, _, before = snapshot(spec, seed)
+    live, _, before = snapshot(spec, seed, include_database=False)
     account = next((a for a in live["accounts"] if hmac.compare_digest(a["sub_id"], token)), None)
     if not account or not account["enabled"] or not account["routes"]:
         raise ValueError("No authorized nodes")
@@ -40,7 +44,7 @@ def subscription(path, *, base=BASE):
     if len(body) > 4 * 1024 * 1024:
         raise ValueError("Native subscription exceeds limit")
     result = filter_native(body, kind, numbers)
-    if snapshot(spec, seed)[2] != before:
+    if snapshot(spec, seed, include_database=False)[2] != before:
         raise ValueError("Policy changed during subscription generation")
     return result, {"s": "text/plain", "m": "application/yaml", "x": "application/json"}[kind]
 
