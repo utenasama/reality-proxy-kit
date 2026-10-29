@@ -34,6 +34,8 @@ def routing(deployment, state):
     rules = [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"},
              {"type": "field", "ip": PRIVATE_V4 + ["::/0"], "outboundTag": "blocked"}]
     if deployment.data["mode"] == "single":
+        rules.insert(1, {"type": "field", "inboundTag": ["rpk-dns"], "ip": [deployment.data.get("dns_ipv4", "1.1.1.1")],
+                         "port": "53", "network": "udp", "outboundTag": "direct"})
         outbounds.append({"tag": "direct", "protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"},
                           "streamSettings": {"sockopt": {"mark": 48211}}})
     else:
@@ -63,7 +65,7 @@ def entry_config(deployment, state):
     return {"log": {"access": "none", "loglevel": "warning"},
             "api": {"tag": "api", "services": ["HandlerService", "StatsService"]},
             "stats": {}, "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
-            "dns": {"servers": [deployment.data.get("dns_ipv4", "1.1.1.1")], "queryStrategy": "UseIPv4"},
+            "dns": {"tag": "rpk-dns", "servers": [deployment.data.get("dns_ipv4", "1.1.1.1")], "queryStrategy": "UseIPv4"},
             "inbounds": [{"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
                           "settings": {"address": "127.0.0.1"}}, proxy],
             "outbounds": outbounds, "routing": rules}
@@ -110,6 +112,8 @@ def allowed_routes(deployment, accounts, template, account):
         raise ValueError("Authorization guard changed")
     result = []
     for rule in rules[:guard]:
+        if deployment.data["mode"] == "single" and rule == {"type": "field", "inboundTag": ["rpk-dns"], "ip": [deployment.data.get("dns_ipv4", "1.1.1.1")], "port": "53", "network": "udp", "outboundTag": "direct"}:
+            continue
         if rule.get("inboundTag") == ["api"] and rule.get("outboundTag") == "api":
             continue
         if rule.get("outboundTag") == "blocked":

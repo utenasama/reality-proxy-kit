@@ -40,6 +40,33 @@ def cli(*args):
     return json.loads(result.stdout)
 
 
+def redact(text):
+    values = []
+    def collect(value):
+        if isinstance(value, dict):
+            for v in value.values(): collect(v)
+        elif isinstance(value, list):
+            for v in value: collect(v)
+        elif isinstance(value, str) and len(value) >= 8:
+            values.append(value)
+    for path in LAB.glob("*/state.json"):
+        collect(read_json(path))
+    for value in sorted(set(values), key=len, reverse=True):
+        text = text.replace(value, "[redacted]")
+    return re.sub(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", "[uuid]", text)
+
+
+def failure_details():
+    for node in CREATED:
+        if node == "target":
+            continue
+        result = docker(node, "journalctl", "--no-pager", "-n", "55", "-u", "rpk-entry", "-u", "rpk-exit", "-u", "x-ui", "-u", "rpk-subscription", check=False)
+        print(node + ": " + redact(result.stdout.decode(errors="replace"))[-5000:], flush=True)
+        result = docker(node, "cat", "/etc/reality-proxy-kit/last-command-error.json", check=False)
+        if result.returncode == 0:
+            print(redact(result.stdout.decode(errors="replace"))[-3000:], flush=True)
+
+
 def start_node(name, address):
     run("docker", "run", "-d", "--privileged", "--cgroupns=host", "--tmpfs", "/run", "--tmpfs", "/run/lock",
         "-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw", "--network", PREFIX + "net", "--ip", address,
@@ -83,7 +110,10 @@ def probe(node, expected, name, success=True):
             if not success:
                 assert response.returncode != 0, "A denied route unexpectedly connected"
                 return
-            assert response.returncode == 0, "Expected HTTPS route failed"
+            if response.returncode:
+                print("curl: " + redact(response.stderr.decode(errors="replace")), flush=True)
+                print("client: " + redact((LAB / (name + "-client.log")).read_text())[-2500:], flush=True)
+                raise AssertionError("Expected HTTPS route failed")
             result = json.loads(response.stdout)
             assert result["peer"] == expected, "Wrong exit address"
             assert any(q["source"] == expected and q["name"] == "test.example.org" for q in result["dns"]), "Domain did not resolve at final exit"
@@ -170,6 +200,9 @@ def main():
                 for target in ("remote", "local"):
                     try:
                         case(mode, management, target)
+                    except Exception:
+                        failure_details()
+                        raise
                     finally:
                         clean_nodes()
     finally:
