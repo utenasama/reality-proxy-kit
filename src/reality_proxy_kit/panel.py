@@ -47,6 +47,27 @@ def client_record(account):
             "flow": "xtls-rprx-vision", "subId": account["sub_id"], "comment": "rpk:id:" + account["id"], "totalGB": 0, "expiryTime": 0}
 
 
+def client_update_payload(record, account):
+    # GET returns ClientRecord; UPDATE consumes Client. Mirror the pinned
+    # upstream ToClient conversion for fields with different JSON shapes.
+    result = copy.deepcopy(record)
+    result.pop("uuid", None)
+    allowed = result.get("allowedIPs", "")
+    if isinstance(allowed, str):
+        result["allowedIPs"] = [v.strip() for v in allowed.split(",") if v.strip()]
+    reverse = result.get("reverse")
+    if isinstance(reverse, str):
+        result["reverse"] = json.loads(reverse) if reverse else None
+    for key in ("createdAt", "updatedAt"):
+        if key in result:
+            result[{"createdAt": "created_at", "updatedAt": "updated_at"}[key]] = result.pop(key)
+    changed = client_record(account)
+    # Native quota, expiry and other optional metadata remain authoritative.
+    changed.pop("totalGB"); changed.pop("expiryTime")
+    result.update(changed)
+    return result
+
+
 def settings(deployment, state):
     domain = deployment.data.get("web", {}).get("domain", "localhost")
     return {"webListen": "127.0.0.1", "webPort": "54321", "webBasePath": "/admin/",
@@ -217,10 +238,6 @@ def change_account(deployment, seed, action, name, routes, expected):
         api.call("panel/api/clients/del/" + urllib.parse.quote(name, safe=""), {}, True)
     elif action != "grant":
         old = api.call("panel/api/clients/get/" + urllib.parse.quote(name, safe=""))["client"]
-        changed = client_record(target)
-        # Preserve native optional quotas/expiry rather than silently clearing them.
-        changed.pop("totalGB"); changed.pop("expiryTime")
-        old.update(changed)
-        api.call("panel/api/clients/update/" + urllib.parse.quote(name, safe=""), old, True)
+        api.call("panel/api/clients/update/" + urllib.parse.quote(name, safe=""), client_update_payload(old, target), True)
     update_template(api, panel_template(deployment, after))
     return after

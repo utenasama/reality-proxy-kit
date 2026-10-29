@@ -7,5 +7,6 @@
 - sing-box v1.14.2 的固定上游 SHA-256 沿用已核验发行清单；本次公开仓库通告查询检出了旧 SOCKS 认证问题，首版使用 SS2022 入站，仍需持续核查依赖与真实行为。[sing-box 公告](https://github.com/SagerNet/sing-box/security/advisories/GHSA-r5hm-mp3j-285g)
 - 新候选内核同时包含旧 X25519 兼容、基于实际 VLESS 身份的路由匹配，以及归一化 UUID 重复拒绝。原生面板写入不能绕过服务端重复身份检查；已知认证 UUID 被重新使用本质上仍是同一凭据，不是新身份。不得用重新使用旧凭据来模拟账户轮换。
 - 各程序固定来源与哈希；部署禁止 production 环境，禁止既有实例升级内核。没有替换原项目生产程序或改变生产兼容开关。
+- 本地 Python 3.12 环境使用 pip-audit 核查 cryptography 50.0.2、PyYAML 6.0.3、qrcode 8.2、cffi 2.1.1、pycparser 3.12，未检出已知漏洞。该结果不覆盖 Go 传递依赖、系统包或未来新通告，完整依赖安全门槛仍未通过。
 
 发布时还要完成原生面板并发/恢复测试、完整依赖复核及公网/手机客户端门槛。结果以 `acceptance.md` 和 `manifests/acceptance.json` 为准。

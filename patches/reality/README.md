@@ -15,6 +15,8 @@ python3 scripts/build_core.py --go /你安装的/go1.27.3/bin/go \
 
 `xray-modified-source.tar.gz` 内含修改后的 Xray、完整修改 REALITY 源码、Go vendor 依赖及其保留的声明、模块来源记录、补丁和构建脚本。在其中的 `xray/` 使用相同工具链、`CGO_ENABLED=0 GOOS=linux GOARCH=amd64` 和脚本记录的 flags 可构建；vendor 支持离线依赖。发布必须同时提供对应源码，不仅链接未修改的上游。
 
+候选二进制由 vendor 创建前的模块模式构建。要复现相同 SHA-256，在解包的 `xray/` 显式使用 `go build -mod=mod`，并保持工具链、环境和链接参数一致；依赖可来自已校验模块缓存。`-mod=vendor` 可完全离线构建，但 Go 会省略二进制中的模块校验和元数据，产物哈希不同，不能拿来替换审核清单中的候选。两种重建均已完成；相同模块模式下二进制逐字节一致。源码归档去除构建机路径并固定归档时间，具体证据见 `docs/acceptance.md`。
+
 本目录 `.go` 补丁沿用 MPL-2.0；REALITY 的 Go 来源代码保留 LICENSE-Go，完整许可位于 `../../licenses/`。构建机器及二进制/源码哈希见 `manifests/core-candidate.json`。候选构建不是发布验收。
 
 升级前必须核对：上游是否仍需补丁、兼容开关语义、新旧握手、错误认证、Xray 与面板交互、实际进程哈希/环境、回退路径、许可与源码。任何一项未通过均不切换。禁止面板一键更新或官方安装脚本直接覆盖兼容内核。

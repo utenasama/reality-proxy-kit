@@ -30,6 +30,21 @@ def deployment(mode="single", management="core", target="remote", web=False):
 
 
 class Models(unittest.TestCase):
+    def test_native_record_update_preserves_limits_and_converts_read_shapes(self):
+        from reality_proxy_kit.panel import client_update_payload
+        d = deployment(management="panel"); s = state.initialize(d, ["alice"])
+        account = dict(s["accounts"][0], enabled=False)
+        native = {"id": 42, "uuid": account["uuid"], "allowedIPs": "", "reverse": "", "totalGB": 123456,
+                  "expiryTime": 1800000000000, "limitHwid": 2, "clientHostRuleIds": [7], "createdAt": 1700000000000}
+        result = client_update_payload(native, account)
+        self.assertEqual(result["allowedIPs"], [])
+        self.assertIsNone(result["reverse"])
+        self.assertEqual(result["id"], account["uuid"])
+        self.assertFalse(result["enable"])
+        for key in ("totalGB", "expiryTime", "limitHwid", "clientHostRuleIds"):
+            self.assertEqual(result[key], native[key])
+        self.assertEqual(native["id"], 42)
+
     def test_eight_combinations_and_private_exports(self):
         for mode in ("single", "chain"):
             for management in ("core", "panel"):
