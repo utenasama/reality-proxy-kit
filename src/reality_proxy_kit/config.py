@@ -168,7 +168,7 @@ def nginx_config(deployment):
 '''
     subs = ""
     if d.get("subscriptions"):
-        subs = '''        location ~ ^/(s|m|x)/[A-Za-z0-9_-]{16,128}$ {
+        subs = '''        location ~ "^/(s|m|x)/[A-Za-z0-9_-]{16,128}$" {
             error_log /dev/null crit;
             limit_req zone=rpk_sub burst=10 nodelay;
             proxy_pass http://127.0.0.1:2097;

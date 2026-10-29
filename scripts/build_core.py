@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build reviewed sources without installing or contacting any VPS."""
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -14,6 +15,23 @@ PINS = {"xray": ("XTLS/Xray-core", "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74"),
         "reality": ("XTLS/REALITY", "83f621788ca88b83179810b12baa7ae518aacb83")}
 OLD = "if peerPub2 == nil {\n\t\t\t\tbreak // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519"
 NEW = "if peerPub2 == nil && !(allowLegacyX25519 && legacyX25519KeyShare(hs.clientHello.keyShares)) {\n\t\t\t\tbreak // enforce upstream profile rules unless legacy X25519 compatibility is enabled"
+
+
+def public_modules(stream):
+    """Keep dependency provenance, excluding builder-local paths and caches."""
+    decoder, modules = json.JSONDecoder(), []
+    fields = ("Path", "Version", "Sum", "GoModSum", "GoVersion", "Main", "Indirect")
+    def public(module):
+        result = {key: module[key] for key in fields if key in module}
+        if "Replace" in module:
+            result["Replace"] = public(module["Replace"])
+        return result
+    while stream.strip():
+        stream = stream.lstrip()
+        module, end = decoder.raw_decode(stream)
+        modules.append(public(module))
+        stream = stream[end:]
+    return json.dumps(modules, indent=2, sort_keys=True) + "\n"
 
 
 def main():
@@ -84,7 +102,7 @@ def main():
     binary = work / "xray-linux-amd64"
     run([*build, "-o", str(binary), "./main"], xray)
     modules = run([go, "list", "-m", "-json", "all"], xray, True).stdout
-    (work / "modules.json").write_text(modules)
+    (work / "modules.json").write_text(public_modules(modules))
     run([go, "mod", "vendor"], xray)
     # Vendor includes modified REALITY and dependency license notices. Also include
     # its complete source (including compatibility tests), not only linked files.
@@ -95,11 +113,12 @@ def main():
         info.uname = info.gname = ""
         return info
     archive = work / "xray-modified-source.tar.gz"
-    with tarfile.open(archive, "w:gz") as tar:
-        for name in ("xray", "reality", "modules.json"):
-            tar.add(work / name, arcname=name, filter=normalize)
-        for name in ("scripts/build_core.py", "patches/reality", "patches/xray", "licenses", "THIRD_PARTY_NOTICES.md", "LICENSE"):
-            tar.add(ROOT / name, arcname="kit/" + name, filter=normalize)
+    with archive.open("wb") as output, gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as zipped:
+        with tarfile.open(fileobj=zipped, mode="w") as tar:
+            for name in ("xray", "reality", "modules.json"):
+                tar.add(work / name, arcname=name, filter=normalize)
+            for name in ("scripts/build_core.py", "patches/reality", "patches/xray", "licenses", "THIRD_PARTY_NOTICES.md", "LICENSE"):
+                tar.add(ROOT / name, arcname="kit/" + name, filter=normalize)
     sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     inputs = [Path(__file__).resolve(), *sorted((ROOT / "patches/reality").glob("*.go")), *sorted((ROOT / "patches/xray").glob("*.go"))]
     manifest = {"schema": 1, "status": "candidate", "xray": PINS["xray"][1], "reality": PINS["reality"][1],

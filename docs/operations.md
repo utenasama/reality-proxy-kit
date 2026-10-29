@@ -3,7 +3,7 @@
 核心模式以控制端私有状态为权威，账户命令先备份、再修改状态，之后需要 render/apply 才改变服务端。面板模式每次从原生面板读当前账户和授权，通过原生 API 修改；旧控制端账户列表不得覆盖在线数据库。两种模式都可能重启入口，已有连接会断开。
 
 ```sh
-.venv/bin/rpk account grant alice --routes exit-a \
+.venv/bin/rpk account grant alice --routes route-a \
   --spec private/deployment.json --state private/state.json \
   --backup-dir private/backups --key private/recovery-key/backup.key
 ```

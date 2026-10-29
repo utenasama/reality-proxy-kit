@@ -99,8 +99,8 @@ def udp_dns():
             assert response[10:12] == b"\x71\x23" and response[12] & 128
 
 
-def probe(node, expected, name, success=True):
-    profile = client.xray_profile(node)
+def probe(node, expected, name, success=True, fingerprint="chrome", checks=True):
+    profile = client.xray_profile(node, fingerprint=fingerprint)
     profile["log"]["loglevel"] = "debug"
     path = LAB / (name + "-client.json"); write_json(path, profile)
     with (LAB / (name + "-client.log")).open("wb") as log:
@@ -118,6 +118,8 @@ def probe(node, expected, name, success=True):
             result = json.loads(response.stdout)
             assert result["peer"] == expected, "Wrong exit address"
             assert any(q["source"] == expected and q["name"] == "test.example.org" for q in result["dns"]), "Domain did not resolve at final exit"
+            if not checks:
+                return
             udp_dns()
             for target in ("http://127.0.0.1:8000/", "http://private.example.org:8000/", "http://[::1]:8000/"):
                 rejected = run("curl", "--noproxy", "", "--socks5-hostname", "127.0.0.1:17808", "-fsS", "--max-time", "5", target, check=False)
@@ -156,6 +158,14 @@ def case(mode, management, target):
         probe(n, nodes[route["exit"]]["ipv4"] if mode == "chain" else nodes["entry"]["ipv4"], label)
     wrong = dict(entries[0], uuid=client.route_uuid(state["accounts"][0]["uuid"], 65534))
     probe(wrong, None, label, False)
+    if mode == "single" and management == "core" and target == "remote":
+        for fingerprint in ("hellochrome_120", "hellosafari_26_3"):
+            probe(entries[0], nodes["entry"]["ipv4"], label, fingerprint=fingerprint, checks=False)
+        import uuid
+        wrong_account = dict(entries[0], uuid=client.route_uuid(str(uuid.uuid4()), 1))
+        probe(wrong_account, None, label, False)
+        wrong_short_id = dict(entries[0], short_id="00" * 8 if entries[0]["short_id"] != "00" * 8 else "11" * 8)
+        probe(wrong_short_id, None, label, False, fingerprint="hellochrome_120")
     if mode == "chain":
         docker("exit-a", "systemctl", "stop", "rpk-exit")
         probe(entries[0], None, label, False)
@@ -187,6 +197,13 @@ def clean_nodes():
 
 
 def main():
+    cases = [(mode, management, target) for mode in ("single", "chain")
+             for management in ("core", "panel") for target in ("remote", "local")]
+    selected = os.environ.get("RPK_LAB_CASE")
+    if selected:
+        cases = [c for c in cases if "-".join(c) == selected]
+        if not cases:
+            raise SystemExit("Unknown isolated lab case")
     if LAB.exists():
         raise SystemExit("Use a clean disposable lab directory")
     LAB.mkdir(parents=True, mode=0o700)
@@ -196,16 +213,14 @@ def main():
     try:
         run("docker", "run", "-d", "--network", PREFIX + "net", "--ip", "192.0.2.2", "--name", PREFIX + "target", "-v", str(ROOT / "tests/lab") + ":/test:ro", "rpk-test-host", "python3", "/test/target.py")
         CREATED.append("target"); time.sleep(3)
-        for mode in ("single", "chain"):
-            for management in ("core", "panel"):
-                for target in ("remote", "local"):
-                    try:
-                        case(mode, management, target)
-                    except Exception:
-                        failure_details()
-                        raise
-                    finally:
-                        clean_nodes()
+        for mode, management, target in cases:
+            try:
+                case(mode, management, target)
+            except Exception:
+                failure_details()
+                raise
+            finally:
+                clean_nodes()
     finally:
         for name in CREATED:
             run("docker", "rm", "-f", PREFIX + name, check=False)

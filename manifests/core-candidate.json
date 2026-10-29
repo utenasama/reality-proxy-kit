@@ -10,7 +10,7 @@
   "traffic_observer": false,
   "identity_env": "RPK_VLESS_IDENTITY_ROUTING=1",
   "inputs": {
-    "scripts/build_core.py": "438e0d7c4157c34c02290be768b605ffac7a43198dfb35e83edf5bb4f1da97d7",
+    "scripts/build_core.py": "7fa0b51dd2cce59ff74ab919e896511292d6ec49308b53225893a54ef4e52c80",
     "patches/reality/legacy_x25519.go": "c05d0e9eb6939401fadbe633148e26f53101e7b6b2eaaf3cebb1ad622ddbbad6",
     "patches/reality/legacy_x25519_test.go": "abf25cf51ffbbcb3ec4bfaed6a19ae0f135cd8ca7c3d0da0161b64d7b5ba9f7e",
     "patches/xray/identity_guard.go": "18c8103408fc5643661b5aa38a526f8cb62d58dfa9d71e5deaf648af0dd322c9",
@@ -19,7 +19,7 @@
     "patches/xray/routing_identity_test.go": "adb6d935cf8c10ef6d1e30ccab0c554cccc681c7e734d1101bea6266c230cddb"
   },
   "sha256": "691a9a7a0fe6ffbf1182d676d0e6eb29ba584cba975a3b66c2193a1310b92e87",
-  "source_sha256": "2e70ecde7aea183cf3a42ebbe9eee9914d75bd3b81f3014b51f8a969fe52a90b",
+  "source_sha256": "e13e524d2ea13b2f9fae5bbe7e5cc10737f80629bfdfa905079f6e90e6f2d79c",
   "tests": [
     [
       "github.com/xtls/reality",
