@@ -62,7 +62,7 @@ def routing(deployment, state):
 def entry_config(deployment, state):
     proxy = inbound(deployment, state)
     outbounds, rules = routing(deployment, state)
-    return {"log": {"access": "none", "loglevel": "warning"},
+    return {"log": {"access": "none", "loglevel": "debug" if deployment.data.get("environment") == "lab" else "warning"},
             "api": {"tag": "api", "services": ["HandlerService", "StatsService"]},
             "stats": {}, "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
             "dns": {"tag": "rpk-dns", "servers": [deployment.data.get("dns_ipv4", "1.1.1.1")], "queryStrategy": "UseIPv4"},

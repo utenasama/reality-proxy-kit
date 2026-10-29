@@ -42,26 +42,25 @@ def dns():
             continue
 
 
-subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2", "-subj", "/CN=remote.example.org", "-addext", "subjectAltName=DNS:remote.example.org,DNS:test.example.org", "-keyout", "/tmp/fixture.key", "-out", "/tmp/fixture.pem"], check=True, capture_output=True)
-Path("/tmp/fixture.key").chmod(0o600)
-threading.Thread(target=dns, daemon=True).start()
-threading.Thread(target=ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever, daemon=True).start()
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain("/tmp/fixture.pem", "/tmp/fixture.key")
-context.set_alpn_protocols(["h2", "http/1.1"])
-
-
 class TLSServer(ThreadingHTTPServer):
     def finish_request(self, request, address):
         # REALITY intentionally mirrors only part of an upstream handshake.
         # Perform TLS negotiation inside each worker, never in the accept loop.
         request.settimeout(30)
         try:
-            with context.wrap_socket(request, server_side=True) as tls:
+            with self.context.wrap_socket(request, server_side=True) as tls:
                 super().finish_request(tls, address)
         except (ssl.SSLError, TimeoutError, OSError):
             pass
 
 
-server = TLSServer(("0.0.0.0", 443), Handler)
-server.serve_forever()
+if __name__ == "__main__":
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2", "-subj", "/CN=remote.example.org", "-addext", "subjectAltName=DNS:remote.example.org,DNS:test.example.org", "-keyout", "/tmp/fixture.key", "-out", "/tmp/fixture.pem"], check=True, capture_output=True)
+    Path("/tmp/fixture.key").chmod(0o600)
+    threading.Thread(target=dns, daemon=True).start()
+    threading.Thread(target=ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever, daemon=True).start()
+    server = TLSServer(("0.0.0.0", 443), Handler)
+    server.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server.context.load_cert_chain("/tmp/fixture.pem", "/tmp/fixture.key")
+    server.context.set_alpn_protocols(["h2", "http/1.1"])
+    server.serve_forever()

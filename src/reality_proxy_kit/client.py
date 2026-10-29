@@ -97,16 +97,19 @@ def export(deployment, state, name, directory):
     return {"nodes": len(entries), "directory": str(directory.resolve()), "sensitive": True}
 
 
-def filter_native(body, kind, numbers):
+def filter_native(body, kind, numbers, account_uuid=None):
     """Only emit independently authorized routes; reject unfamiliar layouts."""
     numbers = set(numbers)
+    from .state import routing_user
+    def authorized(value):
+        return route_number(value) in numbers and (account_uuid is None or routing_user(value) == routing_user(account_uuid))
     if kind == "s":
         text = body.decode()
         encoded = not text.lstrip().startswith("vless://")
         if encoded:
             compact = "".join(text.split())
             text = base64.b64decode(compact + "=" * (-len(compact) % 4), validate=True).decode()
-        lines = [clean_uri(line) for line in text.splitlines() if line.strip() and route_number(urlsplit(line).username) in numbers]
+        lines = [clean_uri(line) for line in text.splitlines() if line.strip() and authorized(urlsplit(line).username)]
         result = "\n".join(lines).encode()
         if not lines:
             raise ValueError("No authorized nodes")
@@ -115,7 +118,7 @@ def filter_native(body, kind, numbers):
         data = yaml.safe_load(body)
         if data.get("proxy-providers"):
             raise ValueError("External providers are not permitted")
-        kept = [p for p in data["proxies"] if p.get("type") == "vless" and route_number(p["uuid"]) in numbers]
+        kept = [p for p in data["proxies"] if p.get("type") == "vless" and authorized(p["uuid"])]
         if not kept:
             raise ValueError("No authorized nodes")
         names = {p["name"] for p in kept}
@@ -136,7 +139,7 @@ def filter_native(body, kind, numbers):
                 raise ValueError("Expected one VLESS node per Xray profile")
             settings = proxies[0]["settings"]
             users = [u for n in settings["vnext"] for u in n["users"]] if "vnext" in settings else [settings]
-            if users and all(route_number(u["id"]) in numbers for u in users):
+            if users and all(authorized(u["id"]) for u in users):
                 for user in users:
                     if not user.get("encryption"):
                         user["encryption"] = "none"

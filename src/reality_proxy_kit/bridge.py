@@ -43,7 +43,7 @@ def subscription(path, *, base=BASE):
         body = response.read(4 * 1024 * 1024 + 1)
     if len(body) > 4 * 1024 * 1024:
         raise ValueError("Native subscription exceeds limit")
-    result = filter_native(body, kind, numbers)
+    result = filter_native(body, kind, numbers, account["uuid"])
     if snapshot(spec, seed, include_database=False)[2] != before:
         raise ValueError("Policy changed during subscription generation")
     return result, {"s": "text/plain", "m": "application/yaml", "x": "application/json"}[kind]

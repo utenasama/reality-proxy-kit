@@ -101,6 +101,7 @@ def udp_dns():
 
 def probe(node, expected, name, success=True):
     profile = client.xray_profile(node)
+    profile["log"]["loglevel"] = "debug"
     path = LAB / (name + "-client.json"); write_json(path, profile)
     with (LAB / (name + "-client.log")).open("wb") as log:
         process = subprocess.Popen([str(CORE / "xray-linux-amd64"), "run", "-c", str(path)], stdout=log, stderr=log)

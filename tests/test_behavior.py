@@ -173,6 +173,12 @@ class Exports(unittest.TestCase):
         self.assertEqual(client.route_number(urlsplit(result[0]).username), 101)
         self.assertFalse({k.lower() for k in parse_qs(urlsplit(result[0]).query)} & {"fp", "fingerprint"})
 
+    def test_native_response_cannot_leak_a_different_accounts_nodes(self):
+        other = state.new_account("other", self.d.active_routes)
+        uri = client.vless_uri(dict(self.nodes[0], uuid=client.route_uuid(other["uuid"], 101)))
+        with self.assertRaises(ValueError):
+            client.filter_native(uri.encode(), "s", [101], self.s["accounts"][0]["uuid"])
+
     def test_native_mihomo_preserves_specific_fingerprint(self):
         import yaml
         body = yaml.safe_dump({"proxies": [client.mihomo_node(n) for n in self.nodes], "proxy-groups": [{"name": "PROXY", "type": "select", "proxies": [n["name"] for n in self.nodes]}]}).encode()
