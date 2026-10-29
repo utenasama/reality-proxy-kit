@@ -166,6 +166,14 @@ def case(mode, management, target):
         probe(wrong_account, None, label, False)
         wrong_short_id = dict(entries[0], short_id="00" * 8 if entries[0]["short_id"] != "00" * 8 else "11" * 8)
         probe(wrong_short_id, None, label, False, fingerprint="hellochrome_120")
+        for operation in ("disable", "enable"):
+            cli("account", operation, "alice", *common, "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+            bundle = folder / ("bundle-" + operation)
+            cli("render", *common, "--core", CORE / "xray-linux-amd64", "--core-manifest", CORE / "build-manifest.json",
+                "--receipts", receipts, "--output", bundle)
+            cli("apply", *common, "--bundle", bundle, "--receipts", receipts,
+                "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+            probe(entries[0], nodes["entry"]["ipv4"], label, operation == "enable", checks=False)
     if mode == "chain":
         docker("exit-a", "systemctl", "stop", "rpk-exit")
         probe(entries[0], None, label, False)
@@ -183,8 +191,39 @@ def case(mode, management, target):
                 if kind == "s":
                     body = response.stdout if response.stdout.startswith(b"vless://") else base64.b64decode(response.stdout)
                     assert b"fp=" not in body and b"fingerprint=" not in body
+                if kind == "x":
+                    profiles = json.loads(response.stdout)
+                    for index, profile in enumerate(profiles if isinstance(profiles, list) else [profiles]):
+                        path = folder / ("native-xray-" + str(index) + ".json"); write_json(path, profile)
+                        validation = run(CORE / "xray-linux-amd64", "run", "-test", "-c", path, check=False)
+                        if validation.returncode:
+                            print(redact(validation.stderr.decode(errors="replace")), flush=True)
+                            raise AssertionError("Native Xray subscription did not validate")
             cli("account", "disable", "alice", *common, "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
             probe(entries[0], None, label, False)
+            if mode == "chain" and target == "remote":
+                def account(operation, *extra):
+                    cli("account", operation, "alice", *extra, *common, "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+                    latest = read_json(state_path)
+                    return latest, next((a for a in latest["accounts"] if a["name"] == "alice"), None)
+                account("enable")
+                probe(entries[0], "192.0.2.12", label, checks=False)
+                account("grant", "--routes", "route-b")
+                probe(entries[0], None, label, False)
+                probe(entries[1], "192.0.2.13", label, checks=False)
+                latest, rotated = account("rotate")
+                assert rotated["id"] == state["accounts"][0]["id"]
+                assert web("/s/" + state["accounts"][0]["sub_id"]).returncode != 0
+                assert web("/s/" + rotated["sub_id"]).returncode == 0
+                probe(entries[1], None, label, False)
+                rotated_nodes = client.nodes(dep, latest, rotated)
+                probe(rotated_nodes[0], "192.0.2.13", label, checks=False)
+                account("delete")
+                probe(rotated_nodes[0], None, label, False)
+                latest, recreated = account("add", "--routes", "route-a")
+                assert recreated["id"] != rotated["id"]
+                assert recreated["routes"] == ["route-a"]
+                probe(client.nodes(dep, latest, recreated)[0], "192.0.2.12", label, checks=False)
     cli("diagnose", *common, "--output", folder / "diagnostic.json")
     print(label + ": passed integration checks", flush=True)
 
