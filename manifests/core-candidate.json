@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "status": "candidate",
+  "xray": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+  "reality": "83f621788ca88b83179810b12baa7ae518aacb83",
+  "go": "go version go1.27.3 darwin/arm64",
+  "target": "linux/amd64",
+  "build_label": "rpk-1b1647c-legacy1-identity1",
+  "compatibility_env": "UTENASAMA_REALITY_LEGACY_X25519=1",
+  "traffic_observer": false,
+  "identity_env": "RPK_VLESS_IDENTITY_ROUTING=1",
+  "inputs": {
+    "scripts/build_core.py": "438e0d7c4157c34c02290be768b605ffac7a43198dfb35e83edf5bb4f1da97d7",
+    "patches/reality/legacy_x25519.go": "c05d0e9eb6939401fadbe633148e26f53101e7b6b2eaaf3cebb1ad622ddbbad6",
+    "patches/reality/legacy_x25519_test.go": "abf25cf51ffbbcb3ec4bfaed6a19ae0f135cd8ca7c3d0da0161b64d7b5ba9f7e",
+    "patches/xray/identity_guard.go": "18c8103408fc5643661b5aa38a526f8cb62d58dfa9d71e5deaf648af0dd322c9",
+    "patches/xray/identity_guard_test.go": "470a21db66622f8d93c4239e74aa4c052f1201cff16efa257f31dba62b7b7c48",
+    "patches/xray/routing_identity.go": "7bc11a2e94fa006ffecd3ea013316e23ee89ff3897187c96d761842c60f3bd1d",
+    "patches/xray/routing_identity_test.go": "adb6d935cf8c10ef6d1e30ccab0c554cccc681c7e734d1101bea6266c230cddb"
+  },
+  "sha256": "691a9a7a0fe6ffbf1182d676d0e6eb29ba584cba975a3b66c2193a1310b92e87",
+  "source_sha256": "2e70ecde7aea183cf3a42ebbe9eee9914d75bd3b81f3014b51f8a969fe52a90b",
+  "tests": [
+    [
+      "github.com/xtls/reality",
+      "-run",
+      "^TestLegacyX25519KeyShare$",
+      "-count=1"
+    ],
+    [
+      "./features/routing/session",
+      "./transport/internet/reality",
+      "./proxy/vless/...",
+      "./proxy/shadowsocks/...",
+      "./proxy/shadowsocks_2022/..."
+    ],
+    [
+      "./app/router",
+      "-run",
+      "^(TestRoutingRule|TestSimpleRouter|TestIPOnDemand|TestIPIfNonMatchIP)$",
+      "-count=1"
+    ]
+  ],
+  "tests_passed": true
+}

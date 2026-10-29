@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reality Proxy Kit"
+  short_description: "搭建与维护单 VPS 或 SS2022 两跳 REALITY 代理"
+  default_prompt: "使用 $deploy-reality-proxy 读取我的部署清单，选择单机或链式方案并完成已授权的部署与验证。"

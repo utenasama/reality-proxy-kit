@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "candidate": "0.1.0.dev0",
+  "installable_release": false,
+  "gates": {
+    "unit_and_cli": "passed",
+    "core_compatibility_tests": "passed",
+    "eight_combination_integration": "pending",
+    "shared_443_behavior": "pending",
+    "public_vps": "pending",
+    "real_acme_renewal": "pending",
+    "mobile_clients": "pending",
+    "lifecycle_and_native_concurrency": "pending",
+    "controller_platforms": "pending",
+    "codex_forward_test": "passed",
+    "licenses_and_source": "pending",
+    "security_advisories": "pending",
+    "secret_scan": "passed"
+  }
+}

@@ -1,0 +1,31 @@
+name: Development candidate verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  behavior:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - run: python -m pip install -e .
+      - run: python -m unittest discover -s tests -v
+      - name: Build reviewed compatibility and identity core
+        run: python scripts/build_core.py --go "$(command -v go)" --work-dir build/core-final --host-binary
+      - name: Actual core config validation
+        run: RPK_XRAY="$PWD/build/core-final/xray-host" python -m unittest discover -s tests -v
+      - name: Disposable Ubuntu integration matrix
+        run: python tests/lab/run.py
