@@ -49,7 +49,7 @@ def redact(text):
             for v in value: collect(v)
         elif isinstance(value, str) and len(value) >= 8:
             values.append(value)
-    for path in LAB.glob("*/state.json"):
+    for path in LAB.rglob("state.json"):
         collect(read_json(path))
     for value in sorted(set(values), key=len, reverse=True):
         text = text.replace(value, "[redacted]")
@@ -62,9 +62,10 @@ def failure_details():
             continue
         result = docker(node, "journalctl", "--no-pager", "-n", "55", "-u", "rpk-entry", "-u", "rpk-exit", "-u", "x-ui", "-u", "rpk-subscription", check=False)
         print(node + ": " + redact(result.stdout.decode(errors="replace"))[-5000:], flush=True)
-        result = docker(node, "cat", "/etc/reality-proxy-kit/last-command-error.json", check=False)
-        if result.returncode == 0:
-            print(redact(result.stdout.decode(errors="replace"))[-3000:], flush=True)
+        for filename in ("last-command-error.json", "last-operation-error.json"):
+            result = docker(node, "cat", "/etc/reality-proxy-kit/" + filename, check=False)
+            if result.returncode == 0:
+                print(redact(result.stdout.decode(errors="replace"))[-3500:], flush=True)
 
 
 def start_node(name, address):
@@ -228,6 +229,7 @@ def case(mode, management, target):
                 restored = folder / "restored"
                 cli("restore", "--archive", saved["file"], "--key", folder / "key/backup.key", "--output", restored)
                 before_restore = read_json(restored / "state.json")
+                print(label + ": restoring a blank entry", flush=True)
                 # Replace only this disposable entry, keeping both exits alive.
                 run("docker", "rm", "-f", PREFIX + "entry"); CREATED.remove("entry")
                 trust = LAB / "known_hosts"

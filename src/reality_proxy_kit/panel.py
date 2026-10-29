@@ -125,7 +125,11 @@ def publish(deployment, state, api=None, initial=False):
             "serverName": deployment.data["reality"]["server_names"][0], "spiderX": "/"}
         updated = dict(proxy, listen=raw["listen"], port=raw["port"],
                        streamSettings=json.dumps(raw["streamSettings"]), sniffing=json.dumps(raw["sniffing"]))
-        api.call("panel/api/inbounds/update/" + str(proxy["id"]), updated)
+        updated.pop("clientStats", None)
+        updated.pop("fallbackParent", None)
+        # Nullable node IDs and native nested fields must not be converted to
+        # Python repr strings by form encoding during restore or topology edits.
+        api.call("panel/api/inbounds/update/" + str(proxy["id"]), updated, True)
     hosts = api.call("panel/api/hosts/list") or []
     desired = []
     for rid, route in deployment.active_routes.items():

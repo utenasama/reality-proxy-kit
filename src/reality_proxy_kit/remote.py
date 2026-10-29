@@ -359,6 +359,8 @@ def apply(archive):
         (BASE / "transaction.json").unlink()
         return {"status": "applied", "revision": m["revision"], "checks": checks, "network_acceptance": "pending"}
     except Exception:
+        import traceback
+        write(BASE / "last-operation-error.json", json.dumps({"traceback": traceback.format_exc()}))
         for service in services(m):
             run(["systemctl", "stop", service], check=False)
         for path in reversed(written):
