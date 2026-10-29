@@ -224,6 +224,44 @@ def case(mode, management, target):
                 assert recreated["id"] != rotated["id"]
                 assert recreated["routes"] == ["route-a"]
                 probe(client.nodes(dep, latest, recreated)[0], "192.0.2.12", label, checks=False)
+                saved = cli("backup", "--live", *common, "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+                restored = folder / "restored"
+                cli("restore", "--archive", saved["file"], "--key", folder / "key/backup.key", "--output", restored)
+                before_restore = read_json(restored / "state.json")
+                # Replace only this disposable entry, keeping both exits alive.
+                run("docker", "rm", "-f", PREFIX + "entry"); CREATED.remove("entry")
+                trust = LAB / "known_hosts"
+                trust.write_text("".join(line for line in trust.read_text().splitlines(True) if not line.startswith("192.0.2.11 ")))
+                restored_spec = read_json(restored / "deployment.json")
+                restored_spec["nodes"]["entry"]["ssh"] = start_node("entry", "192.0.2.11")
+                restored_spec["web"]["static_dir"] = str(restored / "site")
+                write_json(restored / "deployment.json", restored_spec)
+                old_receipts = read_json(receipts); old_receipts.pop("entry")
+                restore_receipts = restored / "receipts.json"; write_json(restore_receipts, old_receipts)
+                common = ["--spec", restored / "deployment.json", "--state", restored / "state.json"]
+                cli("render", *common, "--core", CORE / "xray-linux-amd64", "--core-manifest", CORE / "build-manifest.json",
+                    "--receipts", restore_receipts, "--restore-db", restored / "panel.db", "--output", restored / "bundle")
+                cli("apply", *common, "--bundle", restored / "bundle", "--receipts", restore_receipts,
+                    "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+                cli("refresh", *common, "--output", restored / "verified-state.json")
+                after_restore = read_json(restored / "verified-state.json")
+                for field in ("accounts", "reality", "links", "route_registry", "deployment_id"):
+                    assert before_restore[field] == after_restore[field], "Restore changed stable identities"
+                probe(client.nodes(dep, latest, recreated)[0], "192.0.2.12", label, checks=False)
+                assert web("/s/" + recreated["sub_id"]).returncode == 0
+    if mode == "single" and management == "core" and target == "local":
+        adopted_spec = dict(spec, management="panel", subscriptions=False)
+        adopted_spec_path, adopted_state_path = folder / "adopt-spec.json", folder / "adopt-state.json"
+        write_json(adopted_spec_path, adopted_spec)
+        cli("adopt", *common, "--new-spec", adopted_spec_path, "--output", adopted_state_path,
+            "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+        common = ["--spec", adopted_spec_path, "--state", adopted_state_path]
+        cli("render", *common, "--core", CORE / "xray-linux-amd64", "--core-manifest", CORE / "build-manifest.json",
+            "--receipts", receipts, "--adopt", "--output", folder / "adopt-bundle")
+        cli("apply", *common, "--bundle", folder / "adopt-bundle", "--receipts", receipts,
+            "--backup-dir", folder / "backups", "--key", folder / "key/backup.key")
+        probe(entries[0], "192.0.2.11", label, checks=False)
+        assert web("/s/" + state["accounts"][0]["sub_id"]).returncode != 0
     cli("diagnose", *common, "--output", folder / "diagnostic.json")
     print(label + ": passed integration checks", flush=True)
 
