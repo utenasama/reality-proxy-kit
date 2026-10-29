@@ -36,8 +36,14 @@ def routing(deployment, state):
     if deployment.data["mode"] == "single":
         rules.insert(1, {"type": "field", "inboundTag": ["rpk-dns"], "ip": [deployment.data.get("dns_ipv4", "1.1.1.1")],
                          "port": "53", "network": "udp", "outboundTag": "direct"})
-        outbounds.append({"tag": "direct", "protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"},
-                          "streamSettings": {"sockopt": {"mark": 48211}}})
+        settings = {}
+        if deployment.data.get("environment") == "lab":
+            # Upstream blocks documentation ranges. Only this disposable fixture
+            # needs an exception; private destinations remain denied by routing.
+            settings["finalRules"] = [{"action": "allow", "ip": ["192.0.2.2/32"], "network": "tcp", "port": "443"},
+                                      {"action": "allow", "ip": ["192.0.2.2/32"], "network": "udp", "port": "53"}]
+        outbounds.append({"tag": "direct", "protocol": "freedom", "settings": settings,
+                          "streamSettings": {"sockopt": {"mark": 48211, "domainStrategy": "UseIPv4"}}})
     else:
         for node_id, node in deployment.exits.items():
             outbounds.append({"tag": node_id, "protocol": "shadowsocks", "settings": {"servers": [
